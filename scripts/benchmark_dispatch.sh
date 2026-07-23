@@ -5,8 +5,7 @@ set -euo pipefail
 PARALLEL="${PARALLEL:-2}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TEST_SCRIPT="$SCRIPT_DIR/test_models.py"
-TOTAL_MODELS=$(python3 -c "
-import sys; sys.path.insert(0, '$SCRIPT_DIR')
+TOTAL_MODELS=$(cd "$SCRIPT_DIR" && python3 -c "
 from test_models import fetch_free_models
 print(len(fetch_free_models()))
 ")
