@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-NIMStats is a static-site dashboard for benchmarking NVIDIA NIM models. No build step; everything runs directly in the browser.
+KiloStats is a static-site dashboard for benchmarking every free model on the Kilo AI Gateway. No build step; everything runs directly in the browser.
 
 ```
 index.html          — App shell (nav, sections, modal)
@@ -18,7 +18,7 @@ js/
   modal.js          — Response viewer modal
   tabs/             — Per-tab render modules (overview, leaderboard, explorer, timeline, compare)
 scripts/
-  test_models.py    — Benchmark runner (calls NIM API, writes results)
+  test_models.py    — Benchmark runner (calls Kilo Gateway API, fetches free catalog, writes results)
   db_utils.py       — SQLite read/write utilities for history.db
   merge_results.py  — Merges parallel worker JSON into single DB run
   benchmark_dispatch.sh — Dynamic parallel dispatch of models
@@ -35,14 +35,17 @@ Data flow: GitHub Actions runs `benchmark_dispatch.sh` → `test_models.py` per 
 # Serve dashboard locally
 python3 -m http.server 8000          # Open http://localhost:8000
 
-# Run benchmarks manually (requires NIM_API_KEY)
-NIM_API_KEY=your_key python3 scripts/test_models.py
+# Run benchmarks manually (no key needed for free models; KILO_API_KEY is optional)
+python3 scripts/test_models.py
+
+# With an optional key for dedicated quota
+KILO_API_KEY=your_key python3 scripts/test_models.py
 
 # Run single model by index
-NIM_API_KEY=your_key MODEL_INDEX=0 python3 scripts/test_models.py
+MODEL_INDEX=0 python3 scripts/test_models.py
 
 # Run all models in parallel (2 workers)
-NIM_API_KEY=your_key PARALLEL=2 bash scripts/benchmark_dispatch.sh
+PARALLEL=2 bash scripts/benchmark_dispatch.sh
 
 # Merge worker results after parallel run
 python3 scripts/merge_results.py
@@ -70,7 +73,7 @@ Commit messages follow conventional prefixes visible in git history:
 - `feat: add amazing feature` — new features
 - Use imperative mood, lowercase after the prefix
 
-Benchmarks are triggered via `workflow_dispatch` on GitHub Actions. CI auto-commits updated `history.db.gz` with the standard message above.
+Benchmarks run hourly via cron (`0 * * * *`) on GitHub Actions and can also be triggered via `workflow_dispatch`. CI auto-commits updated `history.db.gz` with the standard message above.
 
 For PRs: fork, create a `feat/` or `fix/` branch, and open against `main`. Include a clear description of what changed and why.
 
@@ -78,7 +81,7 @@ For PRs: fork, create a `feat/` or `fix/` branch, and open against `main`. Inclu
 
 The dashboard is a vanilla JS single-page app with five tabs (Overview, Leaderboard, Explorer, Timeline, Compare). It loads a gzipped SQLite database client-side via WebAssembly (sql.js) and queries it for all chart data. Chart.js renders all visualizations. No framework, no bundler, no package.json.
 
-The benchmark pipeline is Python + bash, running on GitHub Actions. It dynamically dispatches models across parallel workers, collects per-worker JSON results, merges them, and writes a single run row into `history.db`. The database is capped at 30 days of hourly runs (~1440 rows) and auto-pruned on each write.
+The benchmark pipeline is Python + bash, running on GitHub Actions. There is no static `ALL_MODELS` constant — `fetch_free_models()` in `test_models.py` pulls the live free catalog from the Kilo `/models` endpoint at the start of each run, and the dispatch script seeds its worker queue from that. The pipeline dispatches models across parallel workers, collects per-worker JSON results, merges them, and writes a single run row into `history.db`. The database is capped at 14 days of hourly runs (`RETENTION_DAYS = 14` in `db_utils.py`) and auto-pruned on each write.
 
 ### Best Timeslot chart — `computeHourlyStats()` contract
 - Signature: `computeHourlyStats(runs, models?)` — optional `models` allowlist (Set or array); when omitted/empty, all models are aggregated (no behavior change for any other caller). The Best Timeslot card passes the top-5 leaderboard models via `sortModelsByLiveScore(...).slice(0,5)`.
