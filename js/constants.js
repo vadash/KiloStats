@@ -1,14 +1,12 @@
 export const PROVIDER_META = {
-  'deepseek-ai': { name: 'DeepSeek', color: '#4d9de0' },
-  'z-ai':        { name: 'Z-AI',     color: '#11a883' },
-  'minimaxai':   { name: 'MiniMax',  color: '#7c3aed' },
-  'nvidia':      { name: 'NVIDIA',   color: '#8bd11f' },
-  'moonshotai':  { name: 'Moonshot', color: '#0891b2' },
-  'openai':      { name: 'OpenAI',   color: '#2563eb' },
-  'google':      { name: 'Google',   color: '#ea4335' },
-  'qwen':        { name: 'Qwen',     color: '#d97706' },
-  'mistralai':   { name: 'Mistral',  color: '#7e22ce' },
-  'meta':        { name: 'Meta',     color: '#1877f2' },
+  'kilo-auto':    { name: 'Kilo Auto',    color: '#8bd11f' },
+  'stepfun':      { name: 'StepFun',     color: '#e07a46' },
+  'inclusionai':  { name: 'InclusionAI', color: '#5ca7f2' },
+  'poolside':     { name: 'Poolside',    color: '#6d5bd0' },
+  'cohere':       { name: 'Cohere',      color: '#0891b2' },
+  'nvidia':       { name: 'NVIDIA',      color: '#76b900' },
+  'openrouter':   { name: 'OpenRouter',  color: '#2563eb' },
+  'kwaipilot':    { name: 'KwaiPilot',   color: '#d97706' },
 };
 
 export const MODEL_PALETTE = [
