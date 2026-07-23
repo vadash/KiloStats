@@ -1,7 +1,9 @@
-name: Benchmark NVIDIA NIM Models
+name: Benchmark Kilo Gateway Free Models
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 * * * *'
 
 jobs:
   benchmark:
@@ -18,7 +20,7 @@ jobs:
 
       - name: Run parallel benchmarks
         env:
-          NIM_API_KEY: ${{ secrets.NIM_API_KEY }}
+          KILO_API_KEY: ${{ secrets.KILO_API_KEY }}
           PARALLEL: 2
         run: bash scripts/benchmark_dispatch.sh
 
