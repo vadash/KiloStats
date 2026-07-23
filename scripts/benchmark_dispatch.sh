@@ -7,8 +7,8 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TEST_SCRIPT="$SCRIPT_DIR/test_models.py"
 TOTAL_MODELS=$(python3 -c "
 import sys; sys.path.insert(0, '$SCRIPT_DIR')
-from test_models import ALL_MODELS
-print(len(ALL_MODELS))
+from test_models import fetch_free_models
+print(len(fetch_free_models()))
 ")
 
 # Build queue of model indices
