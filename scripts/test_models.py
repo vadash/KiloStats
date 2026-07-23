@@ -15,50 +15,50 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from db_utils import write_run  # noqa: E402
 
-API_BASE = os.getenv("API_BASE", "https://integrate.api.nvidia.com/v1")
-API_KEY = os.getenv("NIM_API_KEY", "")
+API_BASE = os.getenv("API_BASE", "https://api.kilo.ai/api/gateway")
+API_KEY = os.getenv("KILO_API_KEY", "")
+MODELS_ENDPOINT = os.getenv("MODELS_ENDPOINT", f"{API_BASE}/models")
 MODEL_INDEX = os.getenv("MODEL_INDEX")  # set by dispatch to test a single model
 REQUEST_TIMEOUT_SECONDS = int(os.getenv("REQUEST_TIMEOUT_SECONDS", "180"))
 PROMPT = "Write a C# 10 function named IsPrime that takes an int parameter and returns a bool. Use a traditional for loop checking divisibility up to the square root of the number. Do not use advanced pattern matching, LINQ, top-level statements, or external libraries. Provide only the valid C# code inside a markdown code block, with absolutely no introductory, explanatory, or concluding text."
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 
-ALL_MODELS = [
-    # SOTA
-    "z-ai/glm-5.2", # A bit quantized
-    # good for text processing
-    "nvidia/nemotron-3-super-120b-a12b",
-    "openai/gpt-oss-120b",
-    "mistralai/mistral-large-3-675b-instruct-2512", # fat and farious    
-    # mid tier
-    "stepfun-ai/step-3.7-flash",
-    # shit tier
-    "nvidia/nemotron-3-ultra-550b-a55b", # Def open clown model @ nvidia provider, avoid
-    # new hot guy in the block
-    "poolside/laguna-xs-2.1",
-    "thinkingmachines/inkling", # US #1
-]
+def fetch_free_models() -> list[str]:
+    """Fetch the Kilo /models catalog and return ids of free, chat-capable models."""
+    request = urllib.request.Request(MODELS_ENDPOINT, method="GET", headers={"Accept": "application/json"})
+    with urllib.request.urlopen(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:
+        payload = json.loads(response.read().decode("utf-8", errors="replace"))
+    items = payload.get("data", payload) if isinstance(payload, dict) else payload
+    ids = []
+    seen = set()
+    for m in items or []:
+        if not m.get("isFree"):
+            continue
+        mid = m.get("id")
+        if not mid or mid in seen:
+            continue
+        params = m.get("supported_parameters") or []
+        # Both are accepted by every free model today; guard against a future
+        # free entry that only supports e.g. reasoning-only params.
+        if "max_tokens" not in params or "temperature" not in params:
+            continue
+        seen.add(mid)
+        ids.append(mid)
+    return ids
 
-## DEADGE
-# "z-ai/glm-5.1", # replaced by glm52, nice
-# "moonshotai/kimi-k2.6", # not not deadge
-## TOO SLOW
-# "minimaxai/minimax-m2.7", # 49 / 0
-# "deepseek-ai/deepseek-v4-pro", # 49 / 0
-# "deepseek-ai/deepseek-v4-flash", # 35 / 10
-# "minimaxai/minimax-m3", # 30 / 9
-# "qwen/qwen3.5-122b-a10b", # 21 / 20
-# "qwen/qwen3.5-397b-a17b", 38 / 14
-# "mistralai/mistral-medium-3.5-128b", 28s/16tps
 
 def selected_models() -> list[str]:
+    models = fetch_free_models()
+    if not models:
+        print("Error: no free models returned by Kilo /models endpoint", file=sys.stderr)
+        sys.exit(1)
     if MODEL_INDEX is not None:
         idx = int(MODEL_INDEX)
-        if 0 <= idx < len(ALL_MODELS):
-            return [ALL_MODELS[idx]]
-        print(f"Error: MODEL_INDEX={idx} out of range (0-{len(ALL_MODELS)-1})", file=sys.stderr)
+        if 0 <= idx < len(models):
+            return [models[idx]]
+        print(f"Error: MODEL_INDEX={idx} out of range (0-{len(models)-1})", file=sys.stderr)
         sys.exit(1)
-    models = list(ALL_MODELS)
     random.shuffle(models)
     return models
 
@@ -112,15 +112,15 @@ def call_model(model: str, prompt: str) -> dict[str, Any]:
         "stream": False,
     }
     body = json.dumps(payload).encode("utf-8")
+    headers = {"Content-Type": "application/json"}
+    if API_KEY:
+        headers["Authorization"] = f"Bearer {API_KEY}"
 
     request = urllib.request.Request(
         f"{API_BASE}/chat/completions",
         data=body,
         method="POST",
-        headers={
-            "Authorization": f"Bearer {API_KEY}",
-            "Content-Type": "application/json",
-        },
+        headers=headers,
     )
 
     started = time.perf_counter()
@@ -183,6 +183,8 @@ def call_model(model: str, prompt: str) -> dict[str, Any]:
                 content = normalize_content(message.get("content"))
                 if not content.strip():
                     content = normalize_content(message.get("reasoning_content"))
+                if not content.strip():
+                    content = normalize_content(message.get("reasoning"))
 
     if not content.strip():
         print(f"DEBUG: Raw response: {raw_body[:500]}", file=sys.stderr)
@@ -239,16 +241,12 @@ def update_history(new_run: dict[str, Any]) -> None:
 
 
 def main() -> int:
-    if not API_KEY:
-        print("Error: NIM_API_KEY environment variable not set", file=sys.stderr)
-        return 1
-
     models = selected_models()
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     runtime_prompt = build_runtime_prompt()
 
     mode_label = f" (model {MODEL_INDEX}: {models[0]})" if MODEL_INDEX is not None else ""
-    print(f"Starting NVIDIA NIM Model Benchmarks{mode_label}...")
+    print(f"Starting Kilo Gateway Free Model Benchmarks{mode_label}...")
     print(f"Timestamp: {timestamp}")
     print(f"Testing {len(models)} model(s)...")
     print()
