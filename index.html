@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<meta name="darkreader-lock">
+<title>NIMStats | AI Model Benchmark Dashboard</title>
+<link rel="stylesheet" href="vendor/fonts/fonts.css">
+<link rel="stylesheet" href="styles.css">
+<script src="vendor/chart.umd.min.js"></script>
+<script src="vendor/sql-wasm.js"></script>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <p>Loading benchmark data...</p>
+</div>
+
+<div id="app">
+  <nav>
+    <div class="nav-brand"><span>NIMStats</span></div>
+    <div class="nav-tabs">
+      <button class="nav-tab active" data-goto="overview" data-key="01">Overview</button>
+      <button class="nav-tab" data-goto="leaderboard" data-key="02">Leaderboard</button>
+      <button class="nav-tab" data-goto="explorer" data-key="03">Explorer</button>
+      <button class="nav-tab" data-goto="timeline" data-key="04">Timeline</button>
+      <button class="nav-tab" data-goto="compare" data-key="05">Compare</button>
+    </div>
+    <div class="nav-status" id="nav-status"></div>
+  </nav>
+
+  <main>
+    <div id="error-state">
+      <div class="err-icon">ERR</div>
+      <h2>Failed to load benchmark data</h2>
+      <p id="error-msg">Could not fetch history.db.gz. Make sure the file exists and you're serving this page via HTTP.</p>
+    </div>
+
+    <!-- OVERVIEW -->
+    <section data-tab="overview" class="active">
+      <div class="section-header mb-4">
+        <div>
+          <div class="section-title">Benchmark Operations</div>
+          <div class="section-sub" id="overview-sub"></div>
+        </div>
+      </div>
+      <div class="kpi-grid" id="kpi-grid"></div>
+      <div class="chart-row" style="margin-bottom:20px">
+        <div class="card">
+          <div class="card-title"><span class="dot"></span>Best Timeslot to Work</div>
+          <div class="card-sub" id="timeslot-sub"></div>
+          <div id="timeslot-model-picker" class="timeslot-model-picker"></div>
+          <div class="chart-wrap timeslot-chart-wrap"><canvas id="chart-best-timeslot"></canvas></div>
+          <div id="timeslot-recommendations" class="timeslot-recs"></div>
+        </div>
+      </div>
+      <div class="chart-row chart-row-3">
+        <div class="card">
+          <div class="card-title"><span class="dot"></span>Top 10 Fastest Models (Avg)</div>
+          <div class="chart-wrap-lg"><canvas id="chart-fastest"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot"></span>Top 10 Throughput (tok/s)</div>
+          <div class="chart-wrap-lg"><canvas id="chart-throughput"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot"></span>Model Reliability</div>
+          <div class="reliability-grid" id="reliability-grid" style="height:260px;overflow-y:auto"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- LEADERBOARD -->
+    <section data-tab="leaderboard">
+      <div class="section-header mb-4">
+        <div>
+          <div class="section-title">Model Leaderboard</div>
+          <div class="section-sub">Composite ranking across latency, stability, throughput, and wins</div>
+        </div>
+      </div>
+      <div class="table-controls">
+        <input class="search-input" id="lb-search" type="text" placeholder="Filter model name...">
+      </div>
+      <div class="table-wrap">
+        <table id="lb-table">
+          <thead>
+            <tr>
+              <th data-col="rank" class="sorted"># <span class="sort-arrow">v</span></th>
+              <th data-col="model">Model</th>
+              <th data-col="score">Score <span class="sort-arrow">v</span></th>
+              <th data-col="uptime">Uptime <span class="sort-arrow"></span></th>
+              <th data-col="avgTime">Avg Time <span class="sort-arrow"></span></th>
+              <th data-col="bestTime">Best Time <span class="sort-arrow"></span></th>
+              <th data-col="avgTps">Throughput <span class="sort-arrow"></span></th>
+              <th data-col="wins">Wins <span class="sort-arrow"></span></th>
+              <th data-col="trend">Trend</th>
+            </tr>
+          </thead>
+          <tbody id="lb-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- EXPLORER -->
+    <section data-tab="explorer">
+      <div class="model-selector-wrap">
+        <div class="model-selector-label">Select Model</div>
+        <select class="model-select" id="explorer-select"></select>
+      </div>
+      <div class="explorer-header" id="explorer-header"></div>
+      <div class="stats-row" id="explorer-stats"></div>
+      <div class="chart-row chart-row-2" style="margin-bottom:20px">
+        <div class="card">
+          <div class="card-title"><span class="dot"></span>Response Time History</div>
+          <div class="chart-wrap-lg"><canvas id="chart-explorer-time"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot"></span>Error Breakdown</div>
+          <div style="position:relative;height:260px;display:flex;align-items:center;justify-content:center">
+            <canvas id="chart-explorer-errors"></canvas>
+            <div id="explorer-no-errors" class="no-data" style="display:none">100% success rate. No errors recorded.</div>
+          </div>
+        </div>
+      </div>
+      <div class="chart-row chart-row-2">
+        <div class="card">
+          <div class="card-title"><span class="dot"></span>Availability Heatmap</div>
+          <div class="heatmap" id="explorer-heatmap"></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot"></span>Run History (last 20)</div>
+          <div class="run-table-wrap">
+            <table class="run-table">
+              <thead><tr><th>Timestamp</th><th>Status</th><th>Response Time</th><th>Tok/s</th></tr></thead>
+              <tbody id="explorer-run-table"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TIMELINE -->
+    <section data-tab="timeline">
+      <div class="section-header mb-4">
+        <div><div class="section-title">Run Timeline</div></div>
+      </div>
+      <div class="timeline-controls">
+        <div class="run-badge" id="timeline-badge"></div>
+        <div class="filter-btns">
+          <button class="filter-btn active" data-filter="all">All</button>
+          <button class="filter-btn" data-filter="24h">Last 24h</button>
+          <button class="filter-btn" data-filter="48h">Last 48h</button>
+          <button class="filter-btn" data-filter="7d">Last 7d</button>
+        </div>
+      </div>
+      <div class="run-cards" id="run-cards"></div>
+    </section>
+
+    <!-- COMPARE -->
+    <section data-tab="compare">
+      <div class="section-header mb-4">
+        <div><div class="section-title">Model Comparison</div><div class="section-sub">Head-to-head analysis across all runs</div></div>
+      </div>
+      <div class="compare-selectors">
+        <div class="selector-group">
+          <label>Model A</label>
+          <select class="model-select" id="compare-a"></select>
+        </div>
+        <button class="swap-btn" id="swap-btn" title="Swap models">Swap</button>
+        <div class="selector-group">
+          <label>Model B</label>
+          <select class="model-select" id="compare-b"></select>
+        </div>
+      </div>
+      <div class="chart-row chart-row-2" style="margin-bottom:20px">
+        <div class="card">
+          <div class="card-title"><span class="dot"></span>Head-to-Head Stats</div>
+          <table class="h2h-table" id="h2h-table"></table>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot"></span>Response Time Overlay</div>
+          <div class="chart-wrap-lg"><canvas id="chart-compare-time"></canvas></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="dot"></span>Win Timeline (per run)</div>
+        <div class="chart-wrap"><canvas id="chart-compare-wins"></canvas></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- Response Modal -->
+<div id="modal">
+  <div class="modal-box" id="modal-box">
+    <div class="modal-header">
+      <span class="provider-chip" id="modal-provider-chip"></span>
+      <div class="modal-title" id="modal-title"></div>
+      <button class="modal-copy" id="modal-copy">Copy</button>
+      <button class="modal-close" id="modal-close">x</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

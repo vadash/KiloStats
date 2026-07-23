@@ -1,0 +1,41 @@
+name: Benchmark NVIDIA NIM Models
+
+on:
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      
+      - name: Restore history.db from gzip
+        run: gunzip -kf history.db.gz
+
+      - name: Run parallel benchmarks
+        env:
+          NIM_API_KEY: ${{ secrets.NIM_API_KEY }}
+          PARALLEL: 2
+        run: bash scripts/benchmark_dispatch.sh
+
+      - name: Merge results and update history
+        run: python3 scripts/merge_results.py
+
+      - name: Compress history.db to gzip
+        run: gzip -kf history.db
+
+      - name: Commit and push results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add history.db.gz
+          if ! git diff --cached --quiet; then
+            git commit -m "Update benchmark results"
+            git push
+          else
+            echo "No history updates to commit"
+          fi

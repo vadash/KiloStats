@@ -1,0 +1,39 @@
+# .gitignore for NIM Benchmarking Dashboard
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# OS files
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Node (if you add npm packages later)
+node_modules/
+package-lock.json
+yarn.lock
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+npm-debug.log*
+
+# Legacy JSON history (replaced by history.db)
+history.json
+
+# Uncompressed SQLite (only history.db.gz is tracked)
+history.db
+
+# Temporary benchmark output files
+scripts/results*.json
+
+# Python
+__pycache__/
+*.pyc
